@@ -1,0 +1,17 @@
+sqlalchemy
+langchaian_core
+langchain-google-genai
+
+fastapi
+pydantic-settings
+colorlog
+
+langgraph
+passlib
+
+python-jose [cryptography]
+mysql-replication
+qdrantic-client
+
+flask
+uvicorn

@@ -49,7 +49,7 @@ STRICT RULES
    - TRUNCATE
    - CREATE
 3. Use proper JOINs
-4. Use aliases for readability
+4. DO NOT use table aliases
 5. Use LIMIT whenever possible
 6. Use aggregate functions correctly
 7. Generate optimized SQL
@@ -61,6 +61,7 @@ STRICT RULES
 13. Prefer explicit column selection instead of SELECT *
 14. If query requires warehouse-product mapping, use JOIN
 15. If query requires financial insights, use finance_transactions table properly
+16. Always use full table names in SELECT, JOIN, WHERE, GROUP BY, ORDER BY clauses
 
 ==================================================
 EXAMPLE PATTERNS
