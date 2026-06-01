@@ -14,6 +14,11 @@ from app.agents.rag_agent.rag_pipeline import (
     run_rag_pipeline
 )
 
+#from app.agents.analytics_agent.analytics_pipeline import (
+#    run_analytics_pipeline
+#)
+
+
 # ==========================================
 # LOGGER
 # ==========================================
@@ -25,13 +30,21 @@ logger = get_logger(__name__)
 # ==========================================
 def route_user_query(
     db: Session,
-    user_query: str
+    user_query: str,
+    session_id: str | None = None,
+    store_code: str | None = None,
+    retailer_id: int | None = None
 ):
 
     try:
 
         logger.info(
             f"Routing user query: {user_query}"
+        )
+
+        logger.info(
+            f"Context | session_id={session_id} | "
+            f"store_code={store_code} | retailer_id={retailer_id}"
         )
 
         # ==================================
@@ -60,14 +73,24 @@ def route_user_query(
 
             result = run_sql_pipeline(
                 db=db,
-                user_query=user_query
+                user_query=user_query,
+                session_id=session_id,
+                retailer_id=retailer_id
             )
 
             return {
-                "success": result.get("success", False),
+                "success": result.get(
+                    "success",
+                    False
+                ),
+
                 "query_type": "SQL",
+
                 "response": result,
-                "error": result.get("error")
+
+                "error": result.get(
+                    "error"
+                )
             }
 
         # ----------------------------------
@@ -80,10 +103,23 @@ def route_user_query(
             )
 
             result = run_rag_pipeline(
-                user_query
+                user_query=user_query
             )
 
-            return result
+            return {
+                "success": result.get(
+                    "success",
+                    False
+                ),
+
+                "query_type": "RAG",
+
+                "response": result,
+
+                "error": result.get(
+                    "error"
+                )
+            }
 
         # ----------------------------------
         # ANALYTICS ROUTE
@@ -94,12 +130,24 @@ def route_user_query(
                 "Routing to Analytics Agent."
             )
 
+            #result = run_analytics_pipeline(
+            #    db=db,
+            #    user_query=user_query,
+            #    retailer_id=retailer_id
+            #)
+
             return {
-                "success": True,
+                "success": result.get(
+                    "success",
+                    False
+                ),
+
                 "query_type": "ANALYTICS",
-                "response": (
-                    "Analytics pipeline "
-                    "not implemented yet."
+
+                "response": result,
+
+                "error": result.get(
+                    "error"
                 )
             }
 
@@ -114,18 +162,37 @@ def route_user_query(
 
             return {
                 "success": True,
+
                 "query_type": "PREDICTIVE",
-                "response": (
-                    "Predictive pipeline "
-                    "not implemented yet."
-                )
+
+                "response": {
+                    "message": (
+                        "Predictive Agent is connected, "
+                        "but forecasting logic is not implemented yet."
+                    ),
+
+                    "future_scope": [
+                        "Demand forecasting",
+                        "Stock-out risk prediction",
+                        "Sales trend prediction",
+                        "Inventory reorder recommendation"
+                    ]
+                },
+
+                "error": None
             }
 
         # ----------------------------------
         # FALLBACK
         # ----------------------------------
+        logger.warning(
+            f"Unsupported query type: {query_type}"
+        )
+
         return {
             "success": False,
+            "query_type": query_type,
+            "response": None,
             "error": "Unsupported query type."
         }
 
@@ -137,5 +204,7 @@ def route_user_query(
 
         return {
             "success": False,
+            "query_type": None,
+            "response": None,
             "error": str(e)
         }

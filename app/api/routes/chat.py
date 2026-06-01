@@ -1,20 +1,23 @@
-from unittest import result
+from uuid import uuid4
+from typing import Optional, Any
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
-from uuid import uuid4
-from typing import Optional
-
-from app.agents.memory.conversation_memory import (
-    add_message
-)
 
 from sqlalchemy.orm import Session
 
 from app.database.mysql.connection import get_db
 
+from app.agents.memory.conversation_memory import (
+    add_message
+)
+
 from app.agents.orchestrator.router import (
     route_user_query
+)
+
+from app.services.store_context_service import (
+    validate_store_context
 )
 
 from app.core.logging import get_logger
@@ -44,6 +47,8 @@ class ChatRequest(BaseModel):
 
     session_id: Optional[str] = None
 
+    store_code: Optional[str] = None
+
 
 # ==========================================
 # RESPONSE SCHEMA
@@ -52,17 +57,67 @@ class ChatResponse(BaseModel):
 
     success: bool
 
-    session_id: str | None = None
+    session_id: Optional[str] = None
 
-    query_type: str | None = None
+    query_type: Optional[str] = None
 
-    response: dict | list | str | None = None
+    response: Optional[Any] = None
 
-    sql: str | None = None
+    error: Optional[str] = None
 
-    tables: list | None = None
 
-    error: str | None = None
+# ==========================================
+# NORMALIZE RESPONSE FOR FRONTEND
+# ==========================================
+def build_user_facing_response(
+    agent_result: dict
+):
+
+    """
+    This removes developer-only fields like generated_sql
+    and returns only business-facing output.
+    """
+
+    if not agent_result:
+
+        return {
+            "message": "No response generated."
+        }
+
+    agent_response = agent_result.get(
+        "response",
+        agent_result
+    )
+
+    # Sometimes router returns:
+    # {
+    #   success: True,
+    #   query_type: SQL,
+    #   response: {
+    #       success: True,
+    #       data: [...],
+    #       generated_sql: "..."
+    #   }
+    # }
+
+    if isinstance(agent_response, dict):
+
+        return {
+            "answer": (
+                agent_response.get("business_response")
+                or agent_response.get("answer")
+                or agent_response.get("insight")
+                or agent_response.get("message")
+            ),
+
+            "data": agent_response.get("data"),
+
+            "row_count": agent_response.get("row_count"),
+
+            "analytics_type": agent_response.get("analytics_type")
+        }
+
+    return agent_response
 
 
 # ==========================================
@@ -89,8 +144,44 @@ def query_ai_system(
         )
 
         logger.info(
-            f"AI query received for session "
-            f"{session_id}: {request.query}"
+            f"AI query received | "
+            f"session_id={session_id} | "
+            f"store_code={request.store_code} | "
+            f"query={request.query}"
+        )
+
+        # ==============================
+        # STORE CODE REQUIRED
+        # ==============================
+        if not request.store_code:
+
+            return {
+                "success": False,
+                "session_id": session_id,
+                "error": "Store code is required. Please enter your store code."
+            }
+
+        # ==============================
+        # RESOLVE STORE CODE → RETAILER ID
+        # ==============================
+        store_context = validate_store_context(
+            db=db,
+            store_code=request.store_code
+        )
+
+        if not store_context["success"]:
+
+            return {
+                "success": False,
+                "session_id": session_id,
+                "error": store_context["error"]
+            }
+
+        retailer_id = store_context["retailer_id"]
+
+        logger.info(
+            f"Resolved store_code={request.store_code} "
+            f"to retailer_id={retailer_id}"
         )
 
         # ==============================
@@ -107,7 +198,10 @@ def query_ai_system(
         # ==============================
         result = route_user_query(
             db=db,
-            user_query=request.query
+            user_query=request.query,
+            session_id=session_id,
+            store_code=request.store_code,
+            retailer_id=retailer_id
         )
 
         # ==============================
@@ -123,32 +217,33 @@ def query_ai_system(
             "AI query processed successfully."
         )
 
+        user_response = build_user_facing_response(
+            result
+        )
+
         # ==============================
         # FINAL RESPONSE
         # ==============================
-        logger.info(
-    "AI query processed successfully."
-)
-
-        print("FINAL RESULT:", result)
-
-        agent_response = result.get("response", {})
-
         return {
-    "success": result.get("success", False),
+            "success": result.get(
+                "success",
+                False
+            ),
 
-    "session_id": session_id,
+            "session_id": session_id,
 
-    "query_type": result.get("query_type", "SQL"),
+            "query_type": result.get(
+                "query_type",
+                "SQL"
+            ),
 
-    "response": agent_response.get("data"),
+            "response": user_response,
 
-    "sql": agent_response.get("generated_sql"),
+            "error": result.get(
+                "error"
+            )
+        }
 
-    "tables": [],
-
-    "error": result.get("error")
-}
     except Exception as e:
 
         logger.error(

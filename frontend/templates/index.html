@@ -7,6 +7,28 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=Cabinet+Grotesk:wght@400;500;700;800&display=swap" rel="stylesheet" />
 </head>
+<div class="store-box">
+
+  <label for="storeCodeInput">
+    Store Code
+  </label>
+
+  <input
+    id="storeCodeInput"
+    type="text"
+    placeholder="Enter your store code"
+  >
+
+  <button
+    id="saveStoreCodeBtn"
+    type="button"
+  >
+    Save Store Code
+  </button>
+
+  <span id="storeCodeStatus"></span>
+
+</div>
 <body>
 
   <div class="noise"></div>

@@ -46,7 +46,7 @@ def route_query(
 
             "RAG",
 
-            "ANALYTICS",
+            "S",
 
             "PREDICTIVE"
         ]
